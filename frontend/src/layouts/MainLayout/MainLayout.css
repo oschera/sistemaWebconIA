@@ -1,0 +1,24 @@
+.layout-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar-container {
+    width: 260px;
+    background-color: #0f172a; /* Slate 900 */
+    color: white;
+    padding: 2rem 1.5rem;
+}
+
+.sidebar-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #3b82f6; /* Azul brillante */
+    margin-bottom: 3rem;
+}
+
+.main-content {
+    flex: 1;
+    background-color: #f1f5f9; /* Gris muy claro */
+    padding: 2.5rem;
+}
