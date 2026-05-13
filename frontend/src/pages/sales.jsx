@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import inventoryApi from '../api/inventoryApi';
-import { ShoppingCart, Plus, CheckCircle } from 'lucide-react';
+import { ShoppingCart, Plus, CheckCircle, UserPlus, Search, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import './sales.css'; // Asegúrate de crear este archivo con los estilos adecuados
 
 const MySwal = withReactContent(Swal);
 
 const Sales = () => {
-    // --- 1. ESTADOS ---
+    // --- ESTADOS ---
     const [products, setProducts] = useState([]);
     const [cart, setCart] = useState([]);
     const [paymentMethods, setPaymentMethods] = useState([]);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
 
+    // Cliente por defecto (Asegúrate de que en tu DB el ID 1 sea Venta Mostrador)
+    const [selectedClient, setSelectedClient] = useState({ id: 1, full_name: 'Venta Mostrador' });
 
-    // --- 2. CARGA DE DATOS ---
+    // --- CARGA DE DATOS ---
     const fetchInitialData = async () => {
         try {
             const [productsRes, paymentMethodsRes] = await Promise.all([
@@ -26,11 +29,7 @@ const Sales = () => {
             setPaymentMethods(paymentMethodsRes.data);
         } catch (error) {
             console.error(error);
-            MySwal.fire({
-                icon: 'error',
-                title: 'Error de conexión',
-                text: 'No se pudieron cargar los productos del inventario.',
-            });
+            MySwal.fire('Error', 'No se pudo sincronizar con el servidor', 'error');
         }
     };
 
@@ -38,235 +37,335 @@ const Sales = () => {
         fetchInitialData();
     }, []);
 
-    // --- 3. LÓGICA DEL CARRITO ---
-    const addToCart = (product) => {
-        setCart((prevCart) => {
-            const existingItem = prevCart.find(item => Number(item.product_id) === Number(product.id));
+    // --- LÓGICA DE CLIENTES (Sincronizada con tus Schemas) ---
+    const handleAddClient = async () => {
+        const { value: formValues } = await MySwal.fire({
+            title: 'Identificar Cliente',
+            html: `
+                <div class="text-left space-y-3" style="font-family: sans-serif;">
+                    <div>
+                        <label style="font-size: 12px; font-weight: bold;">DNI (8 dígitos)</label>
+                        <div style="display: flex; gap: 5px;">
+                            <input id="swal-dni" class="swal2-input" style="margin:0; width:70%" placeholder="44556677" maxlength="8">
+                            <button id="btn-dni" type="button" style="background:#2563eb; color:white; border:none; border-radius:5px; width:30%; cursor:pointer">Consultar</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; font-weight: bold;">Nombre Completo</label>
+                        <input id="swal-fullname" class="swal2-input" style="margin:0; width:100%; background:#f9fafb" readonly>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; font-weight: bold;">Dirección (Opcional)</label>
+                        <input id="swal-address" class="swal2-input" style="margin:0; width:100%" placeholder="Calle, Av, Jr...">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 12px; font-weight: bold;">Teléfono</label>
+                            <input id="swal-phone" class="swal2-input" style="margin:0; width:100%" placeholder="999888777">
+                        </div>
+                        <div>
+                            <label style="font-size: 12px; font-weight: bold;">Email (Obligatorio)</label>
+                            <input id="swal-email" type="email" class="swal2-input" style="margin:0; width:100%" placeholder="correo@gmail.com">
+                        </div>
+                    </div>
+                </div>
+            `,
+            didOpen: () => {
+                const btnDni = document.getElementById('btn-dni');
+                btnDni.addEventListener('click', async () => {
+                    const dni = document.getElementById('swal-dni').value;
+                    if (dni.length !== 8) return MySwal.showValidationMessage('El DNI debe tener 8 números');
 
-            if (existingItem) {
-                // Validación obligatoria de Stock al sumar
-                if (existingItem.quantity >= product.stock) {
-                    MySwal.fire({
-                        icon: 'warning',
-                        title: 'Stock insuficiente',
-                        text: `Solo contamos con ${product.stock} unidades de este producto.`,
-                    });
-                    return prevCart;
+                    btnDni.innerText = '...';
+                    try {
+                        const res = await inventoryApi.get(`/clients/dni/${dni}`);
+                        // Usamos full_name porque así viene en tu DniResponse
+                        document.getElementById('swal-fullname').value = res.data.full_name;
+                    } catch (e) {
+                        MySwal.showValidationMessage('DNI no encontrado en RENIEC');
+                    } finally {
+                        btnDni.innerText = 'Consultar';
+                    }
+                });
+            },
+            preConfirm: () => {
+                const dni = document.getElementById('swal-dni').value;
+                const full_name = document.getElementById('swal-fullname').value;
+                const email = document.getElementById('swal-email').value;
+
+                if (!dni || !full_name || !email) {
+                    MySwal.showValidationMessage('DNI, Nombre y Email son obligatorios');
+                    return false;
                 }
-
-                return prevCart.map(item =>
-                    Number(item.product_id) === Number(product.id)
-                        ? { ...item, quantity: Number(item.quantity) + 1 }
-                        : item
-                );
-            } else {
-                // Validación obligatoria de Stock al agregar nuevo
-                if (product.stock <= 0) {
-                    MySwal.fire({
-                        icon: 'error',
-                        title: 'Producto Agotado',
-                        text: 'No hay unidades disponibles en el inventario.',
-                    });
-                    return prevCart;
-                }
-
-                return [...prevCart, {
-                    product_id: Number(product.id),
-                    name_product: product.name_product,
-                    price: parseFloat(product.price),
-                    quantity: 1
-                }];
-            }
+                return {
+                    dni: dni,
+                    full_name: full_name,
+                    address: document.getElementById('swal-address').value || null,
+                    phone: document.getElementById('swal-phone').value || null,
+                    email: email
+                };
+            },
+            showCancelButton: true,
+            confirmButtonText: 'Registrar Cliente',
+            confirmButtonColor: '#1e40af'
         });
+
+        if (formValues) {
+            try {
+                // Llamada a tu router: @router.post("/clients/")
+                const response = await inventoryApi.post('/clients/', formValues);
+                setSelectedClient(response.data);
+                MySwal.fire('¡Cliente Vinculado!', response.data.full_name, 'success');
+            } catch (error) {
+                const msg = error.response?.data?.detail || 'Error al guardar';
+                MySwal.fire('Error', msg, 'error');
+            }
+        }
     };
 
+    // --- PROCESAR VENTA ---
     const handleProcessSale = async () => {
         if (cart.length === 0) return;
 
+        const total = cart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+
+        // 1. Confirmación previa a la venta
         const result = await MySwal.fire({
-            title: '¿Confirmar Venta?',
-            text: `Se registrará la venta por un total de $${cart.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}`,
+            title: '¿Confirmar Orden?',
+            html: `<b>Cliente:</b> ${selectedClient.full_name}<br><b>Total:</b> $${total.toFixed(2)}`,
             icon: 'question',
             showCancelButton: true,
+            confirmButtonText: 'Sí, vender',
             confirmButtonColor: '#16a34a',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Sí, completar',
             cancelButtonText: 'Cancelar'
         });
 
         if (result.isConfirmed) {
             try {
-                // --- AJUSTE SEGÚN TU SCHEMA 'OrderCreate' ---
                 const saleData = {
-                    // Tu backend espera: items: List[OrderItemCreate]
+                    client_id: selectedClient.id,
+                    payment_method_id: selectedPaymentMethod,
                     items: cart.map(item => ({
-                        product_id: Number(item.product_id),
-                        quantity: Number(item.quantity),
-                        price: parseFloat(item.price)
-                    })),
-                    // Tu backend espera: payment_method_id: int
-                    payment_method_id: Number(selectedPaymentMethod)
+                        product_id: item.product_id,
+                        quantity: item.quantity,
+                        price: item.price
+                    }))
                 };
 
-                // Enviar al endpoint (ajusta la ruta según tu main.py de FastAPI)
-                // Normalmente es algo como '/orders' o '/sales'
-                const response = await inventoryApi.post('/create_order', saleData);
+                const response = await inventoryApi.post('/create_order/', saleData);
 
-                if (response.status === 200 || response.status === 201) {
+                if (response.status === 201 || response.status === 200) {
+                    const orderData = response.data; // Datos que retorna FastAPI
+
+                    // 2. Alerta de éxito con opción de impresión inteligente
                     await MySwal.fire({
                         icon: 'success',
-                        title: '¡Venta Realizada!',
-                        text: 'El stock ha sido actualizado automáticamente.',
-                        timer: 2000,
-                        showConfirmButton: false
+                        title: 'Venta Exitosa',
+                        text: selectedClient.id !== 1
+                            ? `Venta registrada para ${selectedClient.full_name}. ¿Deseas el ticket?`
+                            : 'Stock actualizado correctamente',
+                        showCancelButton: selectedClient.id !== 1, // Solo muestra "No imprimir" si hay cliente
+                        confirmButtonText: selectedClient.id !== 1 ? '🖨️ Imprimir Ticket' : 'Aceptar',
+                        cancelButtonText: 'Cerrar sin ticket',
+                        confirmButtonColor: '#2563eb'
+                    }).then((res) => {
+                        // 3. Si el usuario eligió imprimir (o es el botón principal del admin)
+                        if (res.isConfirmed && selectedClient.id !== 1) {
+                            imprimirTicket(orderData, selectedClient.full_name);
+                        }
                     });
 
-                    setCart([]); // Limpiar carrito
-                    setSearchTerm(""); // Limpiar buscador
-                    fetchInitialData(); // Refrescar lista de productos con stock nuevo
+                    // 4. Limpieza de interfaz para la siguiente venta
+                    setCart([]);
+                    setSelectedClient({ id: 1, full_name: 'Venta Mostrador' });
+                    fetchInitialData();
                 }
-
             } catch (error) {
-                console.error("Error en la venta:", error);
-
-                // Capturamos el mensaje exacto que lanza tu HTTPException del backend
-                const errorMsg = error.response?.data?.detail || 'Error interno del servidor';
-
-                MySwal.fire({
-                    icon: 'error',
-                    title: 'No se pudo procesar',
-                    text: errorMsg
-                });
+                console.error("Error en venta:", error);
+                MySwal.fire('Error', error.response?.data?.detail || 'No se pudo completar la operación', 'error');
             }
         }
     };
 
-    const filteredProducts = products.filter(product =>
-        product.name_product.toLowerCase().includes(searchTerm.toLowerCase()));
+    // --- LOGICA DE CARRITO ---
+    const addToCart = (product) => {
+        setCart(prev => {
+            const exists = prev.find(i => i.product_id === product.id);
+            if (exists) {
+                if (exists.quantity >= product.stock) return prev;
+                return prev.map(i => i.product_id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
+            }
+            if (product.stock <= 0) return prev;
+            return [...prev, { product_id: product.id, name_product: product.name_product, price: product.price, quantity: 1 }];
+        });
+    };
+
+    const filtered = products.filter(p => p.name_product.toLowerCase().includes(searchTerm.toLowerCase()));
 
     return (
-        <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-
-
-            {/* LADO IZQUIERDO: LISTA DE PRODUCTOS */}
-            <div className="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                {/* BARRA DE BÚSQUEDA (FASE 2) */}
-                <div className="relative mb-4">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Plus className="h-5 w-5 text-gray-400 transform rotate-45" /> {/* Usamos Plus rotado como lupa */}
+        <div className="sales-container">
+            {/* PANEL IZQUIERDO: BUSCADOR Y PRODUCTOS */}
+            <div className="sales-main-panel">
+                <div className="search-container">
+                    <div className="search-wrapper">
+                        <Search className="search-icon" size={20} />
+                        <input
+                            className="search-input"
+                            placeholder="Buscar producto por nombre..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
-                    <input
-                        type="text"
-                        placeholder="Buscar producto..."
-                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-sm transition-all"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)} // Guardamos cada letra que escribes
-                    />
-                </div>
-                {/* LISTA DE PRODUCTOS FILTRADOS (PULIDO FASE 2) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {filteredProducts.length > 0 ? (
-                        // CASO 1: Sí hay productos que coinciden
-                        filteredProducts.map(product => (
-                            <div key={product.id} className="border p-4 rounded-lg flex justify-between items-center hover:shadow-md transition-shadow">
-                                <div>
-                                    <p className="font-bold text-gray-800 notranslate">{product.name_product}</p>
-                                    <p className="text-sm text-gray-500">${product.price} - Stock: {product.stock}</p>
-                                </div>
-                                <button
-                                    onClick={() => addToCart(product)}
-                                    className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors"
-                                >
-                                    <Plus size={20} />
-                                </button>
-                            </div>
-                        ))
-                    ) : (
-                        // CASO 2: No se encontró nada (El pulido)
-                        <div className="md:col-span-2 text-center py-10 bg-gray-50 rounded-lg border border-gray-100">
-                            <Plus className="h-10 w-10 text-gray-300 mx-auto transform rotate-45 mb-2" />
-                            <p className="text-gray-500 font-medium">No se encontraron productos.</p>
-                            <p className="text-xs text-gray-400">Intenta buscar con otro nombre.</p>
-                        </div>
-                    )}
                 </div>
 
+                <div className="products-grid">
+                    {filtered.map(p => (
+                        <div key={p.id} className="product-card">
+                            <div className="product-info">
+                                <h3 className="product-name">{p.name_product}</h3>
+                                <p className="product-details">
+                                    $ {p.price.toFixed(2)} | Stock: {p.stock}
+                                </p>
+                            </div>
+                            <button onClick={() => addToCart(p)} className="add-product-btn">
+                                <Plus size={20} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
             </div>
 
-            {/* LADO DERECHO: CARRITO Y TOTALES */}
-            <div className="bg-gray-50 p-5 rounded-xl shadow-inner border border-gray-200 h-fit text-gray-800">
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <ShoppingCart className="text-gray-700" /> Carrito ({cart.length})
-                </h2>
+            {/* PANEL DERECHO: CLIENTE Y CARRITO */}
+            <div className="sales-sidebar">
+                <div className="sidebar-header">
+                    <h2 className="sidebar-title"><ShoppingCart /> Carrito</h2>
+                    <button onClick={handleAddClient} className="client-action-btn">
+                        <UserPlus size={14} /> {selectedClient.id === 1 ? 'Identificar' : 'Cambiar'}
+                    </button>
+                </div>
 
-                {cart.length === 0 ? (
-                    <div className="py-12 text-center">
-                        <p className="text-gray-400 italic">No hay productos seleccionados</p>
+                <div className={`client-status-card ${selectedClient.id === 1 ? 'client-default' : 'client-active'}`}>
+                    <p className="status-label">Cliente de la venta</p>
+                    <p className="client-name">
+                        {selectedClient.full_name}
+                    </p>
+                </div>
+
+                <div className="cart-items-list">
+                    {cart.map(item => (
+                        <div key={item.product_id} className="cart-item">
+                            <span className="cart-item-name">{item.name_product} (x{item.quantity})</span>
+                            <div className="cart-item-actions">
+                                <span className="cart-item-price">$ {(item.price * item.quantity).toFixed(2)}</span>
+                                <X size={14} className="remove-item-icon" onClick={() => setCart(cart.filter(i => i.product_id !== item.product_id))} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="checkout-section">
+                    <div className="total-display">
+                        <span className="total-label">Total</span>
+                        <span className="total-amount">$ {cart.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}</span>
                     </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="space-y-2 max-h-96 overflow-y-auto">
-                            {cart.map((item) => (
-                                <div key={item.product_id} className="bg-white p-3 rounded shadow-sm flex justify-between items-center border border-gray-100">
-                                    <div>
-                                        <p className="font-bold text-gray-800">{item.name_product}</p>
-                                        <p className="text-sm text-gray-600 font-medium">Cant: {item.quantity}</p>
-                                    </div>
-                                    <p className="font-bold text-green-700">
-                                        ${(item.price * item.quantity).toFixed(2)}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
 
-                        <div className="border-t-2 border-blue-200 pt-4 mt-4 text-right">
-                            <p className="text-xs uppercase text-gray-500 font-bold">Total a pagar</p>
-                            <p className="text-2xl font-black text-blue-800">
-                                ${cart.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}
-                            </p>
-                        </div>
-                        {/* SELECTOR DE MÉTODO DE PAGO (FASE 3) */}
-                        <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                            <label className="block text-xs font-black text-blue-800 uppercase mb-2">
-                                Forma de Pago:
-                            </label>
-                            {paymentMethods.length > 0 ? (
-                                <select
-                                    className="w-full p-2 bg-white border border-blue-200 rounded-md text-sm font-bold text-gray-700 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    value={selectedPaymentMethod}
-                                    onChange={(e) => setSelectedPaymentMethod(Number(e.target.value))}
-                                >
-                                    {paymentMethods.map((method) => (
-                                        <option key={method.id} value={method.id}>
-                                            {method.name_payment_method.toUpperCase()}
-                                        </option>
-                                    ))}
-                                </select>
-                            ) : (
-                                <div className="animate-pulse text-xs text-blue-400 italic">
-                                    Cargando métodos disponibles...
-                                </div>
-                            )}
-                        </div>
+                    <label className="input-label">Método de Pago</label>
+                    <select
+                        className="payment-select"
+                        value={selectedPaymentMethod}
+                        onChange={e => setSelectedPaymentMethod(Number(e.target.value))}
+                    >
+                        {paymentMethods.map(m => <option key={m.id} value={m.id}>{m.name_payment_method}</option>)}
+                    </select>
 
-                        <button
-                            onClick={handleProcessSale}
-                            disabled={cart.length === 0} // 🚨 SEGURO: Si no hay nada, el botón no hace nada
-                            className={`w-full mt-4 py-3 rounded-lg font-bold transition-all flex items-center justify-center gap-2 shadow-md active:scale-95 
-        ${cart.length === 0
-                                    ? 'bg-gray-300 cursor-not-allowed text-gray-500'
-                                    : 'bg-green-600 text-white hover:bg-green-700'
-                                }`}
-                        >
-                            <CheckCircle size={20} />
-                            {cart.length === 0 ? 'Carrito Vacío' : 'Completar Venta'}
-                        </button>
-                    </div>
-                )}
+                    <button
+                        onClick={handleProcessSale}
+                        disabled={cart.length === 0}
+                        className={`complete-sale-btn ${cart.length === 0 ? 'btn-disabled' : 'btn-active'}`}
+                    >
+                        <CheckCircle size={20} /> Completar Venta
+                    </button>
+                </div>
             </div>
         </div>
     );
+};
+const imprimirTicket = (orderData, clientName) => {
+    const ventanaImpresion = window.open('', '_blank');
+
+    // Formatear los productos para el ticket
+    const itemsHtml = orderData.order_items_order.map(item => `
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+            <div style="flex: 2;">${item.product.name_product.substring(0, 20)}</div>
+            <div style="flex: 1; text-align: center;">x${item.quantity}</div>
+            <div style="flex: 1; text-align: right;">${item.sub_amount.toFixed(2)}</div>
+        </div>
+    `).join('');
+
+    ventanaImpresion.document.write(`
+        <html>
+            <head>
+                <style>
+                    @page { margin: 0; }
+                    body { 
+                        font-family: 'Courier New', Courier, monospace; 
+                        width: 280px; /* Ancho ideal para ticketera estándar */
+                        margin: 0; 
+                        padding: 10px;
+                        color: #000;
+                    }
+                    .text-center { text-align: center; }
+                    .linea { border-top: 1px dashed #000; margin: 10px 0; }
+                    .header { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+                    .info { font-size: 11px; margin-bottom: 10px; }
+                    .items { font-size: 11px; }
+                    .total { font-size: 14px; font-weight: bold; text-align: right; margin-top: 10px; }
+                    .footer { font-size: 10px; margin-top: 20px; }
+                </style>
+            </head>
+            <body onload="window.print(); window.close();">
+                <div class="text-center">
+                    <div class="header">SHOP PRO</div>
+                    <div class="info">
+                        RUC: 10758493021<br>
+                        Calle Las Begonias 123, Trujillo<br>
+                        Tel: 987 654 321
+                    </div>
+                </div>
+
+                <div class="linea"></div>
+                
+                <div class="info">
+                    Ticket: #00${orderData.id}<br>
+                    Fecha: ${new Date(orderData.order_date).toLocaleString('es-PE')}<br>
+                    Cliente: ${clientName.toUpperCase()}
+                </div>
+
+                <div class="linea"></div>
+
+                <div class="items">
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px;">
+                        <div style="flex: 2;">DESCRIPCIÓN</div>
+                        <div style="flex: 1; text-align: center;">CANT</div>
+                        <div style="flex: 1; text-align: right;">SUB</div>
+                    </div>
+                    ${itemsHtml}
+                </div>
+
+                <div class="linea"></div>
+
+                <div class="total">
+                    TOTAL: S/ ${orderData.total_amount.toFixed(2)}
+                </div>
+
+                <div class="footer text-center">
+                    ¡GRACIAS POR SU PREFERENCIA!<br>
+                    No se aceptan devoluciones después de 24h.
+                </div>
+                <div style="height: 50px;"></div> </body>
+        </html>
+    `);
+    ventanaImpresion.document.close();
 };
 
 export default Sales;

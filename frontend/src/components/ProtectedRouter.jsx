@@ -12,6 +12,7 @@ const ProtectedRouter = () => {
     try {
         // Verificamos si el token ha expirado
         const decodedToken = jwtDecode(token);
+        const userRole = decodedToken.role; // Asegúrate de que tu token incluya el rol del usuario
         const currentTime = Date.now() / 1000;
 
         if (decodedToken.exp < currentTime) {
@@ -24,6 +25,7 @@ const ProtectedRouter = () => {
         return <Outlet />;
     } catch (error) {
         // Error al decodificar el token (token inválido)
+        console.error('Error al decodificar el token:', error);
         localStorage.removeItem('token');
         return <Navigate to="/login" replace />;
     }

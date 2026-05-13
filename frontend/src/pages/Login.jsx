@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, User, Lock } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { jwtDecode } from 'jwt-decode'; // - Importación necesaria
 import api from '../api/axios';
 
 const Login = () => {
@@ -21,7 +22,6 @@ const Login = () => {
         setLoading(true);
         
         try {
-            // FastAPI OAuth2PasswordRequestForm requiere x-www-form-urlencoded
             const params = new URLSearchParams();
             params.append('username', username);
             params.append('password', password);
@@ -32,10 +32,13 @@ const Login = () => {
                 }
             });
 
-            // Si es exitoso, guardamos el token
             const { access_token } = response.data;
             localStorage.setItem('token', access_token);
             
+            // --- LÓGICA DE REDIRECCIÓN POR ROLES ---
+            const decoded = jwtDecode(access_token); // - Decodificamos el token
+            const userRole = decoded.role; // Obtenemos el rol (ej: 'admin' o 'vendedor')
+
             Swal.fire({
                 icon: 'success',
                 title: '¡Bienvenido!',
@@ -44,8 +47,14 @@ const Login = () => {
                 showConfirmButton: false
             });
 
-            // Redirigimos al dashboard
-            navigate('/');
+            // - Redirección inteligente basada en la planificación
+            if (userRole === 'admin') {
+                navigate('/'); // Administrador va al Dashboard
+            } else if (userRole === 'vendedor') {
+                navigate('/ventas'); // Vendedor va a Ventas
+            } else {
+                navigate('/'); // Redirección por defecto
+            }
             
         } catch (error) {
             console.error('Error de login:', error);
@@ -58,6 +67,7 @@ const Login = () => {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">

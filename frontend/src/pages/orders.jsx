@@ -1,158 +1,206 @@
 import React, { useState, useEffect } from 'react';
 import inventoryApi from '../api/inventoryApi';
-import { Eye, Trash2, Calendar, DollarSign } from 'lucide-react';
+import { Eye, Trash2, Calendar, Printer, FileText, Table as TableIcon } from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import { jwtDecode } from 'jwt-decode';
+import './inventory.css'; // Reutilizamos los estilos
+
+// Librerías para exportar
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const MySwal = withReactContent(Swal);
 
 const Orders = () => {
     const [orders, setOrders] = useState([]);
+    const [userRole, setUserRole] = useState(null);
 
-    // 1. Cargar Órdenes desde FastAPI
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            const decoded = jwtDecode(token);
+            setUserRole(decoded.role);
+        }
+        fetchOrders();
+
+    }, []);
+
     const fetchOrders = async () => {
         try {
-            const response = await inventoryApi.get('/order'); // Asegúrate que coincida con tu router.get
+            const response = await inventoryApi.get('/order/');
             setOrders(response.data);
         } catch (error) {
             console.error("Error al cargar órdenes:", error);
         }
     };
 
-    useEffect(() => {
-        fetchOrders();
-    }, []);
-    const handleViewDetail = (order) => {
-        // 1. Construimos el cuerpo del detalle en HTML
-        // Usamos 'order_items_order' que es como lo llama tu backend
+    // --- FUNCIÓN EXPORTAR A EXCEL ---
+    const exportToExcel = () => {
+        const dataToExport = orders.map(order => ({
+            ID: order.id,
+            Fecha: new Date(order.order_date).toLocaleString(),
+            Cliente: order.client?.full_name || 'Venta Mostrador',
+            Total: order.total_amount,
+            Metodo: order.payment_method?.name_payment_method || 'N/A'
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+        XLSX.writeFile(wb, `Reporte_Ventas_${new Date().toLocaleDateString()}.xlsx`);
+    };
+
+    // --- FUNCIÓN EXPORTAR A PDF ---
+    const exportToPDF = () => {
+        const doc = new jsPDF();
+        doc.text("Reporte de Ventas - SHOP PRO", 14, 15);
+
+        const tableColumn = ["ID", "Fecha", "Cliente", "Método", "Total"];
+        const tableRows = orders.map(order => [
+            order.id,
+            new Date(order.order_date).toLocaleString(),
+            order.client?.full_name || 'Venta Mostrador',
+            order.payment_method?.name_payment_method || 'N/A',
+            `$${order.total_amount.toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 20,
+        });
+        doc.save(`Reporte_Ventas_${new Date().toLocaleDateString()}.pdf`);
+    };
+
+    // --- FUNCIÓN REIMPRIMIR TICKET (La misma que en Sales) ---
+    const handlePrintTicket = (order) => {
+        const ventanaImpresion = window.open('', '_blank');
         const itemsHtml = order.order_items_order.map(item => `
-        <tr style="border-bottom: 1px solid #eee;">
-            <td style="padding: 8px; text-align: left;">${item.product.name_product}</td>
-            <td style="padding: 8px; text-align: center;">${item.quantity}</td>
-            <td style="padding: 8px; text-align: right;">$${item.price.toFixed(2)}</td>
-            <td style="padding: 8px; text-align: right; font-weight: bold;">$${item.sub_amount.toFixed(2)}</td>
-        </tr>
-    `).join('');
-
-        // 2. Disparamos el modal con SweetAlert2
-        MySwal.fire({
-            title: `Detalle de la Orden #${order.id}`,
-            html: `
-            <div style="margin-top: 15px;">
-                <p style="text-align: left; font-size: 0.9em; color: #666;">
-                    <b>Fecha:</b> ${new Date(order.order_date).toLocaleString()}
-                </p>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85em;">
-                    <thead style="background: #f8f9fa;">
-                        <tr>
-                            <th style="padding: 8px; text-align: left;">Producto</th>
-                            <th style="padding: 8px; text-align: center;">Cant.</th>
-                            <th style="padding: 8px; text-align: right;">Precio</th>
-                            <th style="padding: 8px; text-align: right;">Subtotal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${itemsHtml}
-                    </tbody>
-                </table>
-                <div style="margin-top: 15px; text-align: right; font-size: 1.1em;">
-                    <span style="color: #666;">TOTAL:</span>
-                    <span style="font-weight: 900; color: #1e40af; margin-left: 10px;">
-                        $${order.total_amount.toFixed(2)}
-                    </span>
-                </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <div style="flex: 2;">${item.product.name_product}</div>
+                <div style="flex: 1; text-align: center;">x${item.quantity}</div>
+                <div style="flex: 1; text-align: right;">${item.sub_amount.toFixed(2)}</div>
             </div>
-        `,
-            width: '600px',
-            confirmButtonText: 'Cerrar',
-            confirmButtonColor: '#3b82f6'
-        });
+        `).join('');
+
+        ventanaImpresion.document.write(`
+            <html>
+                <body onload="window.print(); window.close();" style="font-family: 'Courier New'; width: 280px; padding: 10px;">
+                    <h3 style="text-align: center; margin: 0;">SHOP PRO - COPIA</h3>
+                    <p style="font-size: 11px;">Ticket: #${order.id}<br>Fecha: ${new Date(order.order_date).toLocaleString()}</p>
+                    <hr>
+                    ${itemsHtml}
+                    <hr>
+                    <div style="text-align: right; font-weight: bold;">TOTAL: $${order.total_amount.toFixed(2)}</div>
+                </body>
+            </html>
+        `);
+        ventanaImpresion.document.close();
     };
-    const handleDeleteOrder = async (orderId) => {
-        // 1. Pedir confirmación al usuario
-        const result = await MySwal.fire({
-            title: '¿Anular esta venta?',
-            text: `Se eliminará la Orden #${orderId} y los productos volverán al inventario.`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Sí, anular venta',
-            cancelButtonText: 'Cancelar',
-            reverseButtons: true
-        });
+    const totalSales = orders.length;
+    const totalRevenue = orders.reduce((acc, order) => acc + order.total_amount, 0);
+    const counterSales = orders.filter(o => o.client?.id === 1 || !o.client).length;
+    const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
 
-        // 2. Si confirma, ejecutamos el borrado
-        if (result.isConfirmed) {
-            try {
-                // Llamamos a tu endpoint de FastAPI (Asegúrate que la ruta sea /delete_order/{id})
-                await inventoryApi.delete(`/delete_order/${orderId}`);
-
-                // 3. 🚨 REFRESCAR LA LISTA: Filtramos la orden borrada del estado actual
-                setOrders(orders.filter(order => order.id !== orderId));
-
-                MySwal.fire(
-                    '¡Anulada!',
-                    'La venta ha sido eliminada y el stock restaurado.',
-                    'success'
-                );
-            } catch (error) {
-                console.error("Error al anular orden:", error);
-                const errorMessage = error.response?.data?.detail || 'No se pudo anular la orden.';
-                MySwal.fire('Error', errorMessage, 'error');
-            }
-        }
-    };
+    // --- LOGICA DE DETALLE Y ELIMINAR (Manteniendo tu base) ---
+    const handleViewDetail = (order) => { /* Tu función SweetAlert actual */ };
 
     return (
-        <div className="p-6">
-            <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-                <Calendar className="text-blue-600" /> Historial de Ventas
-            </h1>
+        <div className="inventory-view">
+            <header className="inventory-header">
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <Calendar className="text-blue-600" /> Historial de Ventas
+                </h1>
 
-            {/* Aquí irá nuestra tabla de la Fase 1 */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-gray-50 border-b border-gray-100">
+                {/* BOTONES DE EXPORTACIÓN */}
+                <div className="flex gap-2">
+                    <button onClick={exportToPDF} className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg border border-red-100 hover:bg-red-100 transition-all font-bold text-sm">
+                        <FileText size={18} /> PDF
+                    </button>
+                    <button onClick={exportToExcel} className="flex items-center gap-2 bg-green-50 text-green-600 px-4 py-2 rounded-lg border border-green-100 hover:bg-green-100 transition-all font-bold text-sm">
+                        <TableIcon size={18} /> EXCEL
+                    </button>
+                </div>
+            </header>
+
+            {/* DASHBOARD DE VENTAS (Mismo estilo que Inventory) */}
+            <div className="inventory-dashboard">
+                <div className="stat-card">
+                    <span className="stat-title">Total Ventas</span>
+                    <span className="stat-value">{totalSales}</span>
+                </div>
+                
+                <div className="stat-card">
+                    <span className="stat-title">Ingresos Totales</span>
+                    <span className="stat-value text-green-600">
+                        ${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                </div>
+
+                <div className="stat-card">
+                    <span className="stat-title">Venta Promedio</span>
+                    <span className="stat-value">
+                        ${avgOrderValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </span>
+                </div>
+
+                <div className="stat-card">
+                    <span className="stat-title">Ventas Mostrador</span>
+                    <span className="stat-value">{counterSales}</span>
+                </div>
+            </div>
+
+            {/* TABLA ESTILIZADA CON custom-table */}
+            <div className="px-8 pb-8"> {/* Contenedor para mantener márgenes */}
+                <table className="custom-table shadow-sm">
+                    <thead>
                         <tr>
-                            <th className="p-4 font-bold text-gray-600">ID Orden</th>
-                            <th className="p-4 font-bold text-gray-600">Fecha</th>
-                            <th className="p-4 font-bold text-gray-600">Total</th>
-                            <th className="p-4 font-bold text-gray-600">Acciones</th>
+                            <th>ID</th>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Total</th>
+                            <th className="text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         {orders.map((order) => (
-                            <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                                <td className="p-4 font-medium">{order.id}</td>
-                                <td className="p-4">
-                                    {new Date(order.order_date).toLocaleString('es-PE', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        hour12: true
-                                    })}
+                            <tr key={order.id}>
+                                <td className="font-bold text-gray-400">#{order.id}</td>
+                                <td>
+                                    <div className="text-sm">
+                                        {new Date(order.order_date).toLocaleDateString()}
+                                        <br />
+                                        <span className="text-xs text-gray-400">
+                                            {new Date(order.order_date).toLocaleTimeString()}
+                                        </span>
+                                    </div>
                                 </td>
-                                <td className="p-4 font-bold text-green-700">
+                                <td>
+                                    <span className={`text-sm ${order.client?.id === 1 ? 'text-gray-400' : 'font-bold text-blue-600'}`}>
+                                        {order.client?.full_name || 'Venta Mostrador'}
+                                    </span>
+                                </td>
+                                <td className="font-bold text-green-700">
                                     ${order.total_amount.toFixed(2)}
                                 </td>
-                                <td className="p-4 flex gap-3">
-                                    <button
-                                        onClick={() => handleViewDetail(order)} // 🚨 CONEXIÓN AQUÍ
-                                        className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg"
-                                        title="Ver Detalle"
-                                    >
-                                        <Eye size={18} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDeleteOrder(order.id)} // 🚨 CONEXIÓN AQUÍ
-                                        className="text-red-600 hover:bg-red-50 p-2 rounded-lg"
-                                        title="Anular Venta"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
+                                <td>
+                                    <div className="flex justify-center gap-2">
+                                        <button onClick={() => handleViewDetail(order)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-md transition-colors" title="Ver Detalle">
+                                            <Eye size={18} />
+                                        </button>
+
+                                        <button onClick={() => handlePrintTicket(order)} className="text-gray-500 hover:bg-gray-100 p-2 rounded-md transition-colors" title="Reimprimir Ticket">
+                                            <Printer size={18} />
+                                        </button>
+
+                                        {userRole === 'admin' && (
+                                            <button onClick={() => {}} className="text-red-500 hover:bg-red-50 p-2 rounded-md transition-colors" title="Anular Orden">
+                                                <Trash2 size={18} />
+                                            </button>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import inventoryApi from '../api/inventoryApi'; // Tu configuración de axios
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
+import {jwtDecode} from 'jwt-decode';
 
 const MySwal = withReactContent(Swal);
 
@@ -10,6 +11,7 @@ const CashClosing = () => {
   const [physicalAmount, setPhysicalAmount] = useState(0);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState(null);
 
   // 1. Cargar el resumen del backend
   const fetchSummary = async () => {
@@ -25,6 +27,11 @@ const CashClosing = () => {
   };
 
   useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      const decoded = jwtDecode(token);
+      setUserRole(decoded.role);
+    }
     fetchSummary();
   }, []);
 
@@ -163,11 +170,12 @@ const CashClosing = () => {
             FINALIZAR CIERRE DE CAJA
           </button>
         </div>
-        <div className="mt-12 bg-white p-6 rounded-lg shadow-lg border border-gray-100">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-800">Historial de Cierres de Caja</h2>
-            <button
-              onClick={fetchHistory}
+        {userRole === 'admin' && (
+          <div className="mt-12 bg-white p-6 rounded-lg shadow-lg border border-gray-100">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-gray-800">Historial de Cierres de Caja</h2>
+              <button
+                onClick={fetchHistory}
               className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
             >
               🔄 Actualizar historial
@@ -216,7 +224,10 @@ const CashClosing = () => {
               </tbody>
             </table>
           </div>
+        
+        
         </div>
+        )}
       </div>
     </div>
   );

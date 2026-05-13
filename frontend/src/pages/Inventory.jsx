@@ -7,6 +7,7 @@ import './Inventory.css'; // 👈 Estilo separado
 import inventoryApi from '../api/inventoryApi'; // 👈 El mensajero
 import { Trash2, Plus } from 'lucide-react';
 import { PenLine } from 'lucide-react';
+import { jwtDecode } from 'jwt-decode'; // Importamos el decodificador
 
 
 
@@ -15,6 +16,11 @@ import { PenLine } from 'lucide-react';
 const Inventory = () => {
     const [product, setProducts] = useState([]); // Estado para guardar los datos
     const [categories, setCategories] = useState([]); // Estado para guardar las categorías
+    const [userRole, setUserRole] = useState(null); // Estado para guardar el rol del usuario
+    const [searchTerm, setSearchTerm] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("Todas");
+    const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
+    const uniqueCategories = ["Todas", ...new Set(product.map(p => p.category_name || "General"))];
 
     // Función para pedir los datos al Backend
     const fetchProducts = async () => {
@@ -26,6 +32,27 @@ const Inventory = () => {
             console.error("Error al traer productos:", error);
         }
     };
+    const requestSort = (key) => {
+        let direction = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    // Lógica de filtrado y ordenamiento en tiempo real
+    const filteredProducts = product
+        .filter(p => {
+            const matchesSearch = p.name_product.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesCategory = selectedCategory === "Todas" || (p.category_name || "General") === selectedCategory;
+            return matchesSearch && matchesCategory;
+        })
+        .sort((a, b) => {
+            if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
     const fetchCategories = async () => {
         try {
             const response = await inventoryApi.get('/categories/'); // GET http://127.0.0.1:8000/categories
@@ -39,8 +66,15 @@ const Inventory = () => {
 
     // Esto se ejecuta UNA vez al cargar la página
     useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            const decoded = jwtDecode(token);
+            setUserRole(decoded.role); // Guardamos el rol en el estado
+        }
+
         fetchProducts();
         fetchCategories();
+
         const intervalo = setInterval(() => {
             console.log("Sincronizando inventario...");
             fetchProducts();
@@ -73,7 +107,7 @@ const Inventory = () => {
                     'success'
                 );
             } catch (error) {
-                const errorMessage = error.response?.data?.detail || 'Error al eliminar el producto';
+                const errorMessage = error.response?.data?.detail || 'el producto tiene relaciones con otras tablas, no se puede eliminar';
                 MySwal.fire({
                     title: 'Error',
                     text: errorMessage,
@@ -99,11 +133,11 @@ const Inventory = () => {
                 </div>
                 <div>
                     <label>Precio ($)</label>
-                    <input id="edit_price" type="number" class="swal2-input" style="width: 70%;" value="${item.price}">
+                    <input id="edit_price" type="number" class="swal2-input" style="width: 70%;" value="${item.price}" >
                 </div>
                 <div>
                     <label>Stock</label>
-                    <input id="edit_stock" type="number" class="swal2-input" style="width: 70%;" value="${item.stock}">
+                    <input id="edit_stock" type="number" class="swal2-input" style="width: 70%;" cursor= not-allowed value="${item.stock}" readonly>
                 </div>
                 <div style="grid-column: span 2;">
                     <label>Categoría</label>
@@ -146,7 +180,7 @@ const Inventory = () => {
         });
         if (formValues) {
             try {
-                const response = await inventoryApi.put(`/update_product/${item.id}/`, formValues);
+                const response = await inventoryApi.put(`/update_products/${item.id}/`, formValues);
                 setProducts(product.map(p => p.id === item.id ? response.data : p));
                 MySwal.fire('¡Actualizado!',
                     'El producto ha sido actualizado exitosamente.',
@@ -161,7 +195,6 @@ const Inventory = () => {
                     text: errorMessage,
                     icon: 'error'
                 });
-
             }
         }
     };
@@ -270,16 +303,20 @@ const Inventory = () => {
             }
         });
 
+
         if (nuevoStock !== undefined) {
             try {
+
+
+                const nuevoStockTotal = parseInt(item.stock) + parseInt(nuevoStock);
                 // Preparamos los datos manteniendo lo demás igual
                 const dataActualizada = {
                     ...item,
-                    stock: parseInt(nuevoStock),
-                    stockProduct: parseInt(nuevoStock) > 0 // Actualización automática de estado
+                    stock: nuevoStockTotal,
+                    stockProduct: nuevoStockTotal > 0 // Actualización automática de estado
                 };
 
-                await inventoryApi.put(`/update_product/${item.id}/`, dataActualizada);
+                await inventoryApi.put(`/update_products/${item.id}/`, dataActualizada);
                 fetchProducts(); // Refrescamos la lista
                 MySwal.fire({ title: '¡Listo!', icon: 'success', toast: true, position: 'top-end', timer: 2000, showConfirmButton: false });
             } catch (error) {
@@ -287,60 +324,124 @@ const Inventory = () => {
             }
         }
     };
+    // Cálculos para el Dashboard
+    const totalProducts = product.length;
+    const lowStockProducts = product.filter(p => p.stock < 5).length; // Definimos bajo stock como < 5
+    const totalInventoryValue = product.reduce((acc, p) => acc + (p.price * p.stock), 0);
+    const activeCategories = new Set(product.map(p => p.category_name || "General")).size;
 
 
     return (
         <div className="inventory-view">
             <header className="inventory-header">
                 <h1 className="text-2xl font-bold">Gestión de Stock</h1>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-all"
-                    onClick={handleCreate}>
-                    <Plus size={18} /> Nuevo Producto
-                </button>
+
+                {/* BOTÓN NUEVO PRODUCTO: Solo Admin */}
+                {userRole === 'admin' && (
+                    <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-all"
+                        onClick={handleCreate}>
+                        <Plus size={18} /> Nuevo Producto
+                    </button>
+                )}
             </header>
+            {/* DASHBOARD METRICS */}
+            <div className="inventory-dashboard">
+                <div className="stat-card">
+                    <span className="stat-title">Total Productos</span>
+                    <span className="stat-value">{totalProducts}</span>
+                </div>
+
+                <div className="stat-card">
+                    <span className="stat-title">Bajo Stock</span>
+                    <span className="stat-value low-stock">{lowStockProducts}</span>
+                    <span className="stat-subtitle">Menos de 5 unidades</span>
+                </div>
+
+                <div className="stat-card">
+                    <span className="stat-title">Valor Total</span>
+                    <span className="stat-value">${totalInventoryValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+
+                <div className="stat-card">
+                    <span className="stat-title">Categorías Activas</span>
+                    <span className="stat-value">{activeCategories}</span>
+                </div>
+            </div>
+
+
+            <div className="filters-container">
+                <div className="search-box">
+                    <input
+                        type="text"
+                        placeholder="Buscar producto..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="filter-input"
+                    />
+                </div>
+
+                <select
+                    className="filter-select"
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                >
+                    {uniqueCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                </select>
+            </div>
+
+            
 
             <table className="custom-table shadow-sm">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Producto</th>
+                        <th onClick={() => requestSort('id')} className="sortable">ID</th>
+                        <th onClick={() => requestSort('name_product')} className="sortable">Producto</th>
                         <th>Descripción</th>
-                        <th>Categoría</th>
-                        <th>Precio</th>
-                        <th>Stock</th>
+                        <th onClick={() => requestSort('category_name')} className="sortable">Categoría</th>
+                        <th onClick={() => requestSort('price')} className="sortable">Precio</th>
+                        <th onClick={() => requestSort('stock')} className="sortable">Stock</th>
                         <th>Estado</th>
-                        <th>Acciones</th>
+                        {userRole === 'admin' && <th>Acciones</th>}
                     </tr>
                 </thead>
                 <tbody>
-                    {product.map((product) => (
+                    {filteredProducts.map((product) => (
                         <tr key={product.id}>
                             <td>{product.id}</td>
                             <td className="font-medium">{product.name_product}</td>
                             <td>{product.description}</td>
                             <td>{product.category_name || "General"}</td>
                             <td>${product.price.toFixed(2)}</td>
-                            <td 
-                                onClick={() => handleQuickStock(product)} 
-                                className="cursor-pointer hover:bg-blue-50 font-bold text-blue-700 underline decoration-dotted"
-                                title="Click para edición rápida"
+
+                            {/* EDICIÓN RÁPIDA DE STOCK: Solo si es Admin */}
+                            <td
+                                onClick={userRole === 'admin' ? () => handleQuickStock(product) : null}
+                                className={userRole === 'admin' ? "cursor-pointer hover:bg-blue-50 font-bold text-blue-700 underline decoration-dotted" : "font-bold text-gray-700"}
+                                title={userRole === 'admin' ? "Click para edición rápida" : ""}
                             >
                                 {product.stock}
                             </td>
+
                             <td>
                                 <span className={`badge- stock ${product.stockProduct ? 'badge-success' : 'badge-danger'}`}>
                                     {product.stockProduct ? 'Disponible' : 'Agotado'}
                                 </span>
                             </td>
-                            <td>
-                                <button className="text-red-500 cursor-pointer hover:bg-red-50 p-2 rounded-md" onClick={() => handleEdit(product)}>
-                                    <PenLine size={18} />
-                                </button>
-                                <button className="text-red-500 cursor-pointer hover:bg-red-50 p-2 rounded-md"
-                                    onClick={() => handleDelete(product.id)}>
-                                    <Trash2 size={18} />
-                                </button>
-                            </td>
+
+                            {/* BOTONES DE ACCIÓN: Solo Admin */}
+                            {userRole === 'admin' && (
+                                <td>
+                                    <button className="text-blue-500 cursor-pointer hover:bg-blue-50 p-2 rounded-md" onClick={() => handleEdit(product)}>
+                                        <PenLine size={18} />
+                                    </button>
+                                    <button className="text-red-500 cursor-pointer hover:bg-red-50 p-2 rounded-md"
+                                        onClick={() => handleDelete(product.id)}>
+                                        <Trash2 size={18} />
+                                    </button>
+                                </td>
+                            )}
                         </tr>
                     ))}
                 </tbody>
