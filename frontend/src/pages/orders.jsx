@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import inventoryApi from '../api/inventoryApi';
-import {Calendar,FileText,Table as TableIcon,Eye,Printer,Trash2,Search} from 'lucide-react';
+import { Calendar, FileText, Table as TableIcon, Eye, Printer, Trash2, Search } from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { jwtDecode } from 'jwt-decode';
 import '../styles/Inventory.css'; // Reutilizamos los estilos
+import '../styles/modal.css'
 
 
 // Librerías para exportar
@@ -348,58 +349,68 @@ const Orders = () => {
             </div>
             {/* MODAL DE DETALLE DE VENTA */}
             {showModal && selectedOrder && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
+                <div className="modal-overlay" onClick={closeModal}>
+                    {/* stopPropagation evita que el modal se cierre al hacer clic dentro del contenido */}
+                    <div className="modal-container modal-lg" onClick={(e) => e.stopPropagation()}>
                         <header className="modal-header">
                             <h2>Detalle de Orden #{selectedOrder.id}</h2>
                             <button onClick={closeModal} className="close-btn">&times;</button>
                         </header>
 
-                        <div className="modal-body">
-                            <div className="detail-info">
-                                <p><strong>Cliente:</strong> {selectedOrder.client?.full_name || 'Venta Mostrador'}</p>
-                                <p><strong>Fecha:</strong> {new Date(selectedOrder.order_date).toLocaleString()}</p>
-                            </div>
-
-                            <table className="custom-table">
-                                <thead>
-                                    <tr>
-                                        <th>Producto</th>
-                                        <th>Cant.</th>
-                                        <th>Precio Unit.</th>
-                                        <th>Subtotal</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {selectedOrder.order_items_order && selectedOrder.order_items_order.length > 0 ? (
-                                        selectedOrder.order_items_order.map((item, index) => (
-                                            <tr key={index}>
-
-                                                <td className="font-medium">{item.product?.name_product}</td>
-                                                <td className="text-center">{item.quantity}</td>
-                                                <td>${item.price.toFixed(2)}</td>
-                                                <td className="font-bold text-blue-700">
-                                                    ${item.sub_amount.toFixed(2)}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="4" className="text-center py-4 text-gray-500 italic">
-                                                No hay productos registrados en esta orden.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-
-                            <div className="modal-footer">
-                                <div className="total-section">
-                                    <span>Total de la venta:</span>
-                                    <span className="total-price">${selectedOrder.total_amount.toFixed(2)}</span>
+                        <div className="modal-body-display">
+                            {/* Información de cabecera de la venta */}
+                            <div className="detail-info-grid">
+                                <div className="info-item">
+                                    <label>Cliente</label>
+                                    <p>{selectedOrder.client?.full_name || 'Venta Mostrador'}</p>
+                                </div>
+                                <div className="info-item">
+                                    <label>Fecha y Hora</label>
+                                    <p>{new Date(selectedOrder.order_date).toLocaleString()}</p>
                                 </div>
                             </div>
+
+                            {/* Tabla de productos con el estilo unificado */}
+                            <div className="table-container-modal">
+                                <table className="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th className="text-center">Cant.</th>
+                                            <th>Precio Unit.</th>
+                                            <th>Subtotal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {selectedOrder.order_items_order && selectedOrder.order_items_order.length > 0 ? (
+                                            selectedOrder.order_items_order.map((item, index) => (
+                                                <tr key={index}>
+                                                    <td className="font-medium">{item.product?.name_product}</td>
+                                                    <td className="text-center">{item.quantity}</td>
+                                                    <td>${item.price.toFixed(2)}</td>
+                                                    <td className="font-bold text-blue-700">
+                                                        ${item.sub_amount.toFixed(2)}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="4" className="text-center py-8 text-gray-400 italic">
+                                                    No hay productos registrados en esta orden.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
+
+                        <footer className="modal-footer-display">
+                            <div className="total-display-modal">
+                                <span className="total-label">Total Pagado</span>
+                                <span className="total-amount-modal">${selectedOrder.total_amount.toFixed(2)}</span>
+                            </div>
+                        </footer>
                     </div>
                 </div>
             )}

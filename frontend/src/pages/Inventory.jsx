@@ -127,85 +127,50 @@ const Inventory = () => {
         const { value: formValues } = await MySwal.fire({
             title: 'Editar Producto',
             html: `
-                <div className="modal-overlay">
-    <div className="modal-container">
-        <header className="modal-header">
-            <h2>Editar Producto</h2>
-            <button className="close-btn" onClick={closeModal}>&times;</button>
-        </header>
+    <div class="modal-overlay-inline">
+        <div class="modal-container">
+            <header class="modal-header">
+                <h2>Editar Producto</h2>
+            </header>
 
-        <div className="modal-body">
-            {/* Nombre */}
-            <div className="modal-group full-width">
-                <label>Nombre del Producto</label>
-                <input 
-                    id="edit_name" 
-                    className="modal-input" 
-                    defaultValue={item.name_product} 
-                />
-            </div>
+            <div class="modal-body">
+                <div class="modal-group full-width">
+                    <label>Nombre del Producto</label>
+                    <input id="edit_name" class="modal-input" value="${item.name_product}">
+                </div>
 
-            {/* Precio */}
-            <div className="modal-group">
-                <label>Precio ($)</label>
-                <input 
-                    id="edit_price" 
-                    type="number" 
-                    className="modal-input" 
-                    defaultValue={item.price} 
-                />
-            </div>
+                <div class="modal-group">
+                    <label>Precio ($)</label>
+                    <input id="edit_price" type="number" class="modal-input" value="${item.price}">
+                </div>
 
-            {/* Stock */}
-            <div className="modal-group">
-                <label>Stock (Sólo lectura)</label>
-                <input 
-                    id="edit_stock" 
-                    type="number" 
-                    className="modal-input" 
-                    defaultValue={item.stock} 
-                    readOnly 
-                />
-            </div>
+                <div class="modal-group">
+                    <label>Stock (Sólo lectura)</label>
+                    <input id="edit_stock" type="number" class="modal-input" value="${item.stock}" readonly>
+                </div>
 
-            {/* Categoría */}
-            <div className="modal-group full-width">
-                <label>Categoría</label>
-                <select id="edit_category" className="modal-input">
-                    {categoryOptions}
-                </select>
-            </div>
+                <div class="modal-group full-width">
+                    <label>Categoría</label>
+                    <select id="edit_category" class="modal-input">
+                        ${categoryOptions}
+                    </select>
+                </div>
 
-            {/* Descripción */}
-            <div className="modal-group full-width">
-                <label>Descripción</label>
-                <input 
-                    id="edit_description" 
-                    className="modal-input" 
-                    defaultValue={item.description || ''} 
-                />
-            </div>
+                <div class="modal-group full-width">
+                    <label>Descripción</label>
+                    <input id="edit_description" class="modal-input" value="${item.description || ''}">
+                </div>
 
-            {/* Switch de disponibilidad */}
-            <div className="modal-group full-width flex-row">
-                <span className="text-sm font-bold text-gray-600">¿Disponible para la venta?</span>
-                <label className="switch">
-                    <input 
-                        type="checkbox" 
-                        id="edit_stockProduct" 
-                        defaultChecked={item.stockProduct} 
-                    />
-                    <span className="slider"></span>
-                </label>
+                <div class="modal-group full-width flex-row-align">
+                    <span class="status-text">¿Disponible para la venta?</span>
+                    <label class="switch">
+                        <input type="checkbox" id="edit_stockProduct" ${item.stockProduct ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
         </div>
-
-        <footer className="modal-footer">
-            <button className="btn-secondary" onClick={closeModal}>Cancelar</button>
-            <button className="btn-primary" onClick={handleSave}>Guardar Cambios</button>
-        </footer>
-    </div>
-</div>`,
+    </div>`,
             focusConfirm: false,
             showCancelButton: true,
             confirmButtonText: 'Guardar',
