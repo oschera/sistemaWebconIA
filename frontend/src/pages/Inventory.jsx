@@ -123,7 +123,13 @@ const Inventory = () => {
     }
 
     const handleEdit = async (item) => {
-        const categoryOptions = categories.map(cat => `<option value="${cat.id}" ${cat.id === item.category_id ? 'selected' : ''}>${cat.name_category}</option>`).join('');
+        // 'item' es el producto que estás editando
+        // Asegúrate de que 'categories' sea el array que viene de tu API de categorías
+        const categoryOptions = categories.map(cat => {
+            // Comparamos el ID de la categoría del producto (item) con el de la lista
+            const selected = cat.id === item.category_id ? 'selected' : '';
+            return `<option value="${cat.id}" ${selected}>${cat.name_category}</option>`;
+        }).join(''); 
         const { value: formValues } = await MySwal.fire({
             title: 'Editar Producto',
             html: `
@@ -427,7 +433,7 @@ const Inventory = () => {
                             <td>{product.id}</td>
                             <td className="font-medium">{product.name_product}</td>
                             <td>{product.description}</td>
-                            <td>{product.category_name || "General"}</td>
+                            <td>{product.category_name}</td>
                             <td>${product.price.toFixed(2)}</td>
 
                             {/* EDICIÓN RÁPIDA DE STOCK: Solo si es Admin */}
