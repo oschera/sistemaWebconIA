@@ -3,7 +3,7 @@ import inventoryApi from '../api/inventoryApi';
 import { ShoppingCart, Plus, CheckCircle, UserPlus, Search, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
-import './sales.css'; // Asegúrate de crear este archivo con los estilos adecuados
+import '../styles/sales.css'; // Asegúrate de crear este archivo con los estilos adecuados
 
 const MySwal = withReactContent(Swal);
 
@@ -15,8 +15,8 @@ const Sales = () => {
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // Cliente por defecto (Asegúrate de que en tu DB el ID 1 sea Venta Mostrador)
-    const [selectedClient, setSelectedClient] = useState({ id: 1, full_name: 'Venta Mostrador' });
+    // Cliente por defecto (Asegúrate de que en tu DB el ID 2 sea Venta Mostrador)
+    const [selectedClient, setSelectedClient] = useState({ id: 2, full_name: 'Venta Mostrador' });
 
     // --- CARGA DE DATOS ---
     const fetchInitialData = async () => {
@@ -161,23 +161,23 @@ const Sales = () => {
                     await MySwal.fire({
                         icon: 'success',
                         title: 'Venta Exitosa',
-                        text: selectedClient.id !== 1
+                        text: selectedClient.id !== 2
                             ? `Venta registrada para ${selectedClient.full_name}. ¿Deseas el ticket?`
                             : 'Stock actualizado correctamente',
-                        showCancelButton: selectedClient.id !== 1, // Solo muestra "No imprimir" si hay cliente
-                        confirmButtonText: selectedClient.id !== 1 ? '🖨️ Imprimir Ticket' : 'Aceptar',
+                        showCancelButton: selectedClient.id !== 2, // Solo muestra "No imprimir" si hay cliente
+                        confirmButtonText: selectedClient.id !== 2 ? '🖨️ Imprimir Ticket' : 'Aceptar',
                         cancelButtonText: 'Cerrar sin ticket',
                         confirmButtonColor: '#2563eb'
                     }).then((res) => {
                         // 3. Si el usuario eligió imprimir (o es el botón principal del admin)
-                        if (res.isConfirmed && selectedClient.id !== 1) {
+                        if (res.isConfirmed && selectedClient.id !== 2) {
                             imprimirTicket(orderData, selectedClient.full_name);
                         }
                     });
 
                     // 4. Limpieza de interfaz para la siguiente venta
                     setCart([]);
-                    setSelectedClient({ id: 1, full_name: 'Venta Mostrador' });
+                    setSelectedClient({ id: 2, full_name: 'Venta Mostrador' });
                     fetchInitialData();
                 }
             } catch (error) {

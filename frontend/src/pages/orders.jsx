@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import inventoryApi from '../api/inventoryApi';
-import { Eye, Trash2, Calendar, Printer, FileText, Table as TableIcon } from 'lucide-react';
+import {Calendar,FileText,Table as TableIcon,Eye,Printer,Trash2,Search} from 'lucide-react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { jwtDecode } from 'jwt-decode';
-import './inventory.css'; // Reutilizamos los estilos
+import '../styles/Inventory.css'; // Reutilizamos los estilos
+
 
 // Librerías para exportar
 import { jsPDF } from 'jspdf';
@@ -16,6 +17,10 @@ const MySwal = withReactContent(Swal);
 const Orders = () => {
     const [orders, setOrders] = useState([]);
     const [userRole, setUserRole] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [searchTerm, setSearchTerm] = useState("");
+
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -26,6 +31,7 @@ const Orders = () => {
         fetchOrders();
 
     }, []);
+
 
     const fetchOrders = async () => {
         try {
@@ -105,7 +111,81 @@ const Orders = () => {
     const avgOrderValue = totalSales > 0 ? totalRevenue / totalSales : 0;
 
     // --- LOGICA DE DETALLE Y ELIMINAR (Manteniendo tu base) ---
-    const handleViewDetail = (order) => { /* Tu función SweetAlert actual */ };
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [showModal, setShowModal] = useState(false);
+
+    // Función para abrir el detalle
+    const handleViewDetail = (order) => {
+        setSelectedOrder(order);
+        setShowModal(true);
+    };
+
+    // Función para cerrar el modal
+    const closeModal = () => {
+        setShowModal(false);
+        setSelectedOrder(null);
+    };
+
+    const handleDeleteOrder = async (id) => {
+        const result = await MySwal.fire({
+            title: '¿Estás seguro?',
+            text: "¡Esta acción no se puede deshacer!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar'
+        });
+        if (result.isConfirmed) {
+            try {
+                await inventoryApi.delete(`/delete_order/${id}/`);
+                const nuevaLista = orders.filter(order => order.id !== id);
+                setOrders(nuevaLista);
+                MySwal.fire('¡Eliminado!', 'La orden ha sido eliminada.', 'success');
+            } catch (error) {
+                console.error("Error al eliminar la orden:", error);
+                MySwal.fire('Error', 'No se pudo eliminar la orden. Inténtalo de nuevo.', 'error');
+            }
+        }
+
+
+        /* Tu función SweetAlert actual */
+
+
+    };
+    // Estado para los filtros
+    const [filters, setFilters] = useState({
+        client: "",
+        dateFrom: "",
+        dateTo: "",
+        saleType: "Todos",
+        minAmount: 0
+    });
+
+    // Lógica de filtrado en tiempo real
+    const filteredOrders = orders.filter(order => {
+        // 1. Filtro por Cliente
+        const matchesClient = (order.client?.full_name || "Venta Mostrador")
+            .toLowerCase()
+            .includes(filters.client.toLowerCase());
+
+        // 2. Filtro por Rango de Fechas
+        const orderDate = new Date(order.order_date).getTime();
+        const from = filters.dateFrom ? new Date(filters.dateFrom).getTime() : null;
+        const to = filters.dateTo ? new Date(filters.dateTo).getTime() : null;
+        const matchesDate = (!from || orderDate >= from) && (!to || orderDate <= to);
+
+        // 3. Filtro por Tipo de Venta (Mostrador vs Cliente Identificado)
+        const matchesType = filters.saleType === "Todos" ||
+            (filters.saleType === "Mostrador" && order.client?.id === 1) ||
+            (filters.saleType === "Cliente" && order.client?.id !== 1);
+
+        // 4. Filtro por Monto Mínimo
+        const matchesAmount = order.total_amount >= (parseFloat(filters.minAmount) || 0);
+
+        return matchesClient && matchesDate && matchesType && matchesAmount;
+    });
 
     return (
         <div className="inventory-view">
@@ -124,6 +204,65 @@ const Orders = () => {
                     </button>
                 </div>
             </header>
+            <div className="filters-container-pro">
+                <div className="filter-group main-search">
+                    <label>Cliente</label>
+                    <div className="search-wrapper">
+                        <Search className="search-icon" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Buscar por cliente..."
+                            className="filter-input-pro"
+                            value={filters.client}
+                            onChange={(e) => setFilters({ ...filters, client: e.target.value })}
+                        />
+                    </div>
+                </div>
+
+                <div className="filter-group">
+                    <label>Desde</label>
+                    <input
+                        type="date"
+                        className="filter-input-pro"
+                        value={filters.dateFrom}
+                        onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })}
+                    />
+                </div>
+
+                <div className="filter-group">
+                    <label>Hasta</label>
+                    <input
+                        type="date"
+                        className="filter-input-pro"
+                        value={filters.dateTo}
+                        onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })}
+                    />
+                </div>
+
+                <div className="filter-group">
+                    <label>Tipo</label>
+                    <select
+                        className="filter-select-pro"
+                        value={filters.saleType}
+                        onChange={(e) => setFilters({ ...filters, saleType: e.target.value })}
+                    >
+                        <option value="Todos">Todos</option>
+                        <option value="Mostrador">Mostrador</option>
+                        <option value="Cliente">Clientes Reg.</option>
+                    </select>
+                </div>
+
+                <div className="filter-group">
+                    <label>Monto Mín.</label>
+                    <input
+                        type="number"
+                        placeholder="0.00"
+                        className="filter-input-pro"
+                        value={filters.minAmount}
+                        onChange={(e) => setFilters({ ...filters, minAmount: e.target.value })}
+                    />
+                </div>
+            </div>
 
             {/* DASHBOARD DE VENTAS (Mismo estilo que Inventory) */}
             <div className="inventory-dashboard">
@@ -131,7 +270,7 @@ const Orders = () => {
                     <span className="stat-title">Total Ventas</span>
                     <span className="stat-value">{totalSales}</span>
                 </div>
-                
+
                 <div className="stat-card">
                     <span className="stat-title">Ingresos Totales</span>
                     <span className="stat-value text-green-600">
@@ -165,7 +304,7 @@ const Orders = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {orders.map((order) => (
+                        {filteredOrders.map((order) => (
                             <tr key={order.id}>
                                 <td className="font-bold text-gray-400">#{order.id}</td>
                                 <td>
@@ -178,7 +317,7 @@ const Orders = () => {
                                     </div>
                                 </td>
                                 <td>
-                                    <span className={`text-sm ${order.client?.id === 1 ? 'text-gray-400' : 'font-bold text-blue-600'}`}>
+                                    <span className={`text-sm ${order.client?.id === 2 ? 'text-gray-400' : 'font-bold text-blue-600'}`}>
                                         {order.client?.full_name || 'Venta Mostrador'}
                                     </span>
                                 </td>
@@ -196,7 +335,7 @@ const Orders = () => {
                                         </button>
 
                                         {userRole === 'admin' && (
-                                            <button onClick={() => {}} className="text-red-500 hover:bg-red-50 p-2 rounded-md transition-colors" title="Anular Orden">
+                                            <button onClick={() => handleDeleteOrder(order.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-md transition-colors" title="Anular Orden">
                                                 <Trash2 size={18} />
                                             </button>
                                         )}
@@ -207,6 +346,63 @@ const Orders = () => {
                     </tbody>
                 </table>
             </div>
+            {/* MODAL DE DETALLE DE VENTA */}
+            {showModal && selectedOrder && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <header className="modal-header">
+                            <h2>Detalle de Orden #{selectedOrder.id}</h2>
+                            <button onClick={closeModal} className="close-btn">&times;</button>
+                        </header>
+
+                        <div className="modal-body">
+                            <div className="detail-info">
+                                <p><strong>Cliente:</strong> {selectedOrder.client?.full_name || 'Venta Mostrador'}</p>
+                                <p><strong>Fecha:</strong> {new Date(selectedOrder.order_date).toLocaleString()}</p>
+                            </div>
+
+                            <table className="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Cant.</th>
+                                        <th>Precio Unit.</th>
+                                        <th>Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedOrder.order_items_order && selectedOrder.order_items_order.length > 0 ? (
+                                        selectedOrder.order_items_order.map((item, index) => (
+                                            <tr key={index}>
+
+                                                <td className="font-medium">{item.product?.name_product}</td>
+                                                <td className="text-center">{item.quantity}</td>
+                                                <td>${item.price.toFixed(2)}</td>
+                                                <td className="font-bold text-blue-700">
+                                                    ${item.sub_amount.toFixed(2)}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="4" className="text-center py-4 text-gray-500 italic">
+                                                No hay productos registrados en esta orden.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+
+                            <div className="modal-footer">
+                                <div className="total-section">
+                                    <span>Total de la venta:</span>
+                                    <span className="total-price">${selectedOrder.total_amount.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

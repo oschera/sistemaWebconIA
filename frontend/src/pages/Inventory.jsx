@@ -3,11 +3,12 @@ import withReactContent from 'sweetalert2-react-content';
 const MySwal = withReactContent(Swal);
 
 import React, { useState, useEffect } from 'react';
-import './Inventory.css'; // 👈 Estilo separado
+import '../styles/Inventory.css'; // 👈 Estilo separado
 import inventoryApi from '../api/inventoryApi'; // 👈 El mensajero
 import { Trash2, Plus } from 'lucide-react';
 import { PenLine } from 'lucide-react';
 import { jwtDecode } from 'jwt-decode'; // Importamos el decodificador
+import '../styles/modal.css'; // Reutilizamos los estilos
 
 
 
@@ -126,37 +127,85 @@ const Inventory = () => {
         const { value: formValues } = await MySwal.fire({
             title: 'Editar Producto',
             html: `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left;">
-                <div style="grid-column: span 2;">
-                    <label>Nombre del Producto</label>
-                    <input id="edit_name" class="swal2-input" style="width: 85%;" value="${item.name_product}">
-                </div>
-                <div>
-                    <label>Precio ($)</label>
-                    <input id="edit_price" type="number" class="swal2-input" style="width: 70%;" value="${item.price}" >
-                </div>
-                <div>
-                    <label>Stock</label>
-                    <input id="edit_stock" type="number" class="swal2-input" style="width: 70%;" cursor= not-allowed value="${item.stock}" readonly>
-                </div>
-                <div style="grid-column: span 2;">
-                    <label>Categoría</label>
-                    <select id="edit_category" class="swal2-input" style="width: 85%;">
-                        ${categoryOptions}
-                    </select>
-                </div>
-                <div style="grid-column: span 2;">
-                    <label>Descripción</label>
-                    <input id="edit_description" class="swal2-input" style="width: 85%;" value="${item.description || ''}">
-                </div>
-                <div style="grid-column: span 2; display: flex; align-items: center; justify-content: center; gap: 15px; margin-top: 10px;">
-                    <span>¿Disponible?</span>
-                    <label class="switch">
-                        <input type="checkbox" id="edit_stockProduct" ${item.stockProduct ? 'checked' : ''}>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>`,
+                <div className="modal-overlay">
+    <div className="modal-container">
+        <header className="modal-header">
+            <h2>Editar Producto</h2>
+            <button className="close-btn" onClick={closeModal}>&times;</button>
+        </header>
+
+        <div className="modal-body">
+            {/* Nombre */}
+            <div className="modal-group full-width">
+                <label>Nombre del Producto</label>
+                <input 
+                    id="edit_name" 
+                    className="modal-input" 
+                    defaultValue={item.name_product} 
+                />
+            </div>
+
+            {/* Precio */}
+            <div className="modal-group">
+                <label>Precio ($)</label>
+                <input 
+                    id="edit_price" 
+                    type="number" 
+                    className="modal-input" 
+                    defaultValue={item.price} 
+                />
+            </div>
+
+            {/* Stock */}
+            <div className="modal-group">
+                <label>Stock (Sólo lectura)</label>
+                <input 
+                    id="edit_stock" 
+                    type="number" 
+                    className="modal-input" 
+                    defaultValue={item.stock} 
+                    readOnly 
+                />
+            </div>
+
+            {/* Categoría */}
+            <div className="modal-group full-width">
+                <label>Categoría</label>
+                <select id="edit_category" className="modal-input">
+                    {categoryOptions}
+                </select>
+            </div>
+
+            {/* Descripción */}
+            <div className="modal-group full-width">
+                <label>Descripción</label>
+                <input 
+                    id="edit_description" 
+                    className="modal-input" 
+                    defaultValue={item.description || ''} 
+                />
+            </div>
+
+            {/* Switch de disponibilidad */}
+            <div className="modal-group full-width flex-row">
+                <span className="text-sm font-bold text-gray-600">¿Disponible para la venta?</span>
+                <label className="switch">
+                    <input 
+                        type="checkbox" 
+                        id="edit_stockProduct" 
+                        defaultChecked={item.stockProduct} 
+                    />
+                    <span className="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <footer className="modal-footer">
+            <button className="btn-secondary" onClick={closeModal}>Cancelar</button>
+            <button className="btn-primary" onClick={handleSave}>Guardar Cambios</button>
+        </footer>
+    </div>
+</div>`,
             focusConfirm: false,
             showCancelButton: true,
             confirmButtonText: 'Guardar',
@@ -344,6 +393,7 @@ const Inventory = () => {
                     </button>
                 )}
             </header>
+
             {/* DASHBOARD METRICS */}
             <div className="inventory-dashboard">
                 <div className="stat-card">
@@ -391,7 +441,7 @@ const Inventory = () => {
                 </select>
             </div>
 
-            
+
 
             <table className="custom-table shadow-sm">
                 <thead>
