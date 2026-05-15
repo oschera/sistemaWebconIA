@@ -179,8 +179,8 @@ const Orders = () => {
 
         // 3. Filtro por Tipo de Venta (Mostrador vs Cliente Identificado)
         const matchesType = filters.saleType === "Todos" ||
-            (filters.saleType === "Mostrador" && order.client?.id === 1) ||
-            (filters.saleType === "Cliente" && order.client?.id !== 1);
+            (filters.saleType === "Venta Mostrador" && order.client?.id === 2) ||
+            (filters.saleType === "Cliente" && order.client?.id !== 2);
 
         // 4. Filtro por Monto Mínimo
         const matchesAmount = order.total_amount >= (parseFloat(filters.minAmount) || 0);
@@ -205,6 +205,9 @@ const Orders = () => {
                     </button>
                 </div>
             </header>
+
+            {/*filtros de los clientes */}
+
             <div className="filters-container-pro">
                 <div className="filter-group main-search">
                     <label>Cliente</label>
@@ -248,7 +251,7 @@ const Orders = () => {
                         onChange={(e) => setFilters({ ...filters, saleType: e.target.value })}
                     >
                         <option value="Todos">Todos</option>
-                        <option value="Mostrador">Mostrador</option>
+                        <option value="Venta Mostrador">Venta Mostrador</option>
                         <option value="Cliente">Clientes Reg.</option>
                     </select>
                 </div>

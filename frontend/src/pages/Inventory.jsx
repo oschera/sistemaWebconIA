@@ -21,7 +21,7 @@ const Inventory = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("Todas");
     const [sortConfig, setSortConfig] = useState({ key: 'id', direction: 'asc' });
-    const uniqueCategories = ["Todas", ...new Set(product.map(p => p.category_name || "General"))];
+    const uniqueCategories = ["Todas", ...new Set(product.map(p => p.category?.name_category || "General"))];
 
     // Función para pedir los datos al Backend
     const fetchProducts = async () => {
@@ -33,6 +33,16 @@ const Inventory = () => {
             console.error("Error al traer productos:", error);
         }
     };
+    const fetchCategories = async () => {
+        try {
+            const response = await inventoryApi.get('/categories/'); // GET http://127.0.0.1:8000/categories
+            setCategories(response.data);
+            console.log("¡Categorías cargadas con éxito!");
+        } catch (error) {
+            console.error("Error al traer categorías:", error);
+        }
+    };
+
     const requestSort = (key) => {
         let direction = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -45,7 +55,7 @@ const Inventory = () => {
     const filteredProducts = product
         .filter(p => {
             const matchesSearch = p.name_product.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesCategory = selectedCategory === "Todas" || (p.category_name || "General") === selectedCategory;
+            const matchesCategory = selectedCategory === "Todas" || (p.category?.name_category || "General") === selectedCategory;
             return matchesSearch && matchesCategory;
         })
         .sort((a, b) => {
@@ -54,15 +64,7 @@ const Inventory = () => {
             return 0;
         });
 
-    const fetchCategories = async () => {
-        try {
-            const response = await inventoryApi.get('/categories/'); // GET http://127.0.0.1:8000/categories
-            setCategories(response.data);
-            console.log("¡Categorías cargadas con éxito!");
-        } catch (error) {
-            console.error("Error al traer categorías:", error);
-        }
-    };
+
 
 
     // Esto se ejecuta UNA vez al cargar la página
@@ -83,6 +85,8 @@ const Inventory = () => {
 
         return () => clearInterval(intervalo);
     }, []);
+
+    // Función para eliminar un producto
 
     const handleDelete = async (id) => {
         const result = await MySwal.fire({
@@ -122,6 +126,8 @@ const Inventory = () => {
 
     }
 
+    // Función para editar un producto
+
     const handleEdit = async (item) => {
         // 'item' es el producto que estás editando
         // Asegúrate de que 'categories' sea el array que viene de tu API de categorías
@@ -129,54 +135,54 @@ const Inventory = () => {
             // Comparamos el ID de la categoría del producto (item) con el de la lista
             const selected = cat.id === item.category_id ? 'selected' : '';
             return `<option value="${cat.id}" ${selected}>${cat.name_category}</option>`;
-        }).join(''); 
+        }).join('');
         const { value: formValues } = await MySwal.fire({
             title: 'Editar Producto',
             html: `
-    <div class="modal-overlay-inline">
-        <div class="modal-container">
-            <header class="modal-header">
-                <h2>Editar Producto</h2>
-            </header>
+                <div class="modal-overlay-inline">
+                    <div class="modal-container">
+                        <header class="modal-header">
+                            <h2>Editar Producto</h2>
+                        </header>
 
-            <div class="modal-body">
-                <div class="modal-group full-width">
-                    <label>Nombre del Producto</label>
-                    <input id="edit_name" class="modal-input" value="${item.name_product}">
-                </div>
+                        <div class="modal-body">
+                            <div class="modal-group full-width">
+                                <label>Nombre del Producto</label>
+                                <input id="edit_name" class="modal-input" value="${item.name_product}">
+                            </div>
 
-                <div class="modal-group">
-                    <label>Precio ($)</label>
-                    <input id="edit_price" type="number" class="modal-input" value="${item.price}">
-                </div>
+                            <div class="modal-group">
+                                <label>Precio ($)</label>
+                                <input id="edit_price" type="number" class="modal-input" value="${item.price}">
+                            </div>
 
-                <div class="modal-group">
-                    <label>Stock (Sólo lectura)</label>
-                    <input id="edit_stock" type="number" class="modal-input" value="${item.stock}" readonly>
-                </div>
+                            <div class="modal-group">
+                                <label>Stock (Sólo lectura)</label>
+                                <input id="edit_stock" type="number" class="modal-input" value="${item.stock}" readonly>
+                            </div>
 
-                <div class="modal-group full-width">
-                    <label>Categoría</label>
-                    <select id="edit_category" class="modal-input">
-                        ${categoryOptions}
-                    </select>
-                </div>
+                            <div class="modal-group full-width">
+                                <label>Categoría</label>
+                                <select id="edit_category" class="modal-input">
+                                    ${categoryOptions}
+                                </select>
+                            </div>
 
-                <div class="modal-group full-width">
-                    <label>Descripción</label>
-                    <input id="edit_description" class="modal-input" value="${item.description || ''}">
-                </div>
+                            <div class="modal-group full-width">
+                                <label>Descripción</label>
+                                <input id="edit_description" class="modal-input" value="${item.description || ''}">
+                            </div>
 
-                <div class="modal-group full-width flex-row-align">
-                    <span class="status-text">¿Disponible para la venta?</span>
-                    <label class="switch">
-                        <input type="checkbox" id="edit_stockProduct" ${item.stockProduct ? 'checked' : ''}>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-        </div>
-    </div>`,
+                            <div class="modal-group full-width flex-row-align">
+                                <span class="status-text">¿Disponible para la venta?</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="edit_stockProduct" ${item.stockProduct ? 'checked' : ''}>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>`,
             focusConfirm: false,
             showCancelButton: true,
             confirmButtonText: 'Guardar',
@@ -201,7 +207,8 @@ const Inventory = () => {
         if (formValues) {
             try {
                 const response = await inventoryApi.put(`/update_products/${item.id}/`, formValues);
-                setProducts(product.map(p => p.id === item.id ? response.data : p));
+                await fetchProducts(); // Refrescamos la lista para mostrar los cambios
+
                 MySwal.fire('¡Actualizado!',
                     'El producto ha sido actualizado exitosamente.',
                     'success'
@@ -218,6 +225,8 @@ const Inventory = () => {
             }
         }
     };
+
+    // Función para crear un nuevo producto
 
     const handleCreate = async () => {
         const categoryOptions = categories.map(cat => `<option value="${cat.id}">${cat.name_category}</option>`).join('');
@@ -308,6 +317,8 @@ const Inventory = () => {
 
 
     };
+
+    // Función para edición rápida de stock (sólo admin)
     const handleQuickStock = async (item) => {
         const { value: nuevoStock } = await MySwal.fire({
             title: `Actualizar Stock: ${item.name_product}`,
@@ -389,6 +400,7 @@ const Inventory = () => {
                 </div>
             </div>
 
+            { }
 
             <div className="filters-container">
                 <div className="search-box">
@@ -433,7 +445,7 @@ const Inventory = () => {
                             <td>{product.id}</td>
                             <td className="font-medium">{product.name_product}</td>
                             <td>{product.description}</td>
-                            <td>{product.category_name}</td>
+                            <td>{product.category?.name_category}</td>
                             <td>${product.price.toFixed(2)}</td>
 
                             {/* EDICIÓN RÁPIDA DE STOCK: Solo si es Admin */}

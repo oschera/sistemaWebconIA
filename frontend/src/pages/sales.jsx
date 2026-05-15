@@ -42,31 +42,77 @@ const Sales = () => {
         const { value: formValues } = await MySwal.fire({
             title: 'Identificar Cliente',
             html: `
-                <div class="text-left space-y-3" style="font-family: sans-serif;">
-                    <div>
-                        <label style="font-size: 12px; font-weight: bold;">DNI (8 dígitos)</label>
-                        <div style="display: flex; gap: 5px;">
-                            <input id="swal-dni" class="swal2-input" style="margin:0; width:70%" placeholder="44556677" maxlength="8">
-                            <button id="btn-dni" type="button" style="background:#2563eb; color:white; border:none; border-radius:5px; width:30%; cursor:pointer">Consultar</button>
+              <div className="modal-overlay">
+                    <div className="modal-container">
+                        <header className="modal-header">
+                            <h2>Registrar Nuevo Cliente</h2>
+                            <button className="close-btn" onClick={closeModal}>&times;</button>
+                        </header>
+
+                        <div className="modal-body">
+                            {/* DNI con botón de consulta */}
+                            <div className="modal-group full-width">
+                                <label>DNI (8 dígitos)</label>
+                                <div className="input-with-button">
+                                    <input 
+                                        id="swal-dni" 
+                                        className="modal-input" 
+                                        placeholder="44556677" 
+                                        maxLength="8" 
+                                    />
+                                    <button id="btn-dni" type="button" className="btn-action-primary">
+                                        Consultar
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Nombre Completo */}
+                            <div className="modal-group full-width">
+                                <label>Nombre Completo</label>
+                                <input 
+                                    id="swal-fullname" 
+                                    className="modal-input" 
+                                    placeholder="Se completará automáticamente..." 
+                                    readOnly 
+                                />
+                            </div>
+
+                            {/* Dirección */}
+                            <div className="modal-group full-width">
+                                <label>Dirección (Opcional)</label>
+                                <input 
+                                    id="swal-address" 
+                                    className="modal-input" 
+                                    placeholder="Calle, Av, Jr..." 
+                                />
+                            </div>
+
+                            {/* Teléfono */}
+                            <div className="modal-group">
+                                <label>Teléfono</label>
+                                <input 
+                                    id="swal-phone" 
+                                    className="modal-input" 
+                                    placeholder="999888777" 
+                                />
+                            </div>
+
+                            {/* Email */}
+                            <div className="modal-group">
+                                <label>Email (Obligatorio)</label>
+                                <input 
+                                    id="swal-email" 
+                                    type="email" 
+                                    className="modal-input" 
+                                    placeholder="correo@gmail.com" 
+                                />
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <label style="font-size: 12px; font-weight: bold;">Nombre Completo</label>
-                        <input id="swal-fullname" class="swal2-input" style="margin:0; width:100%; background:#f9fafb" readonly>
-                    </div>
-                    <div>
-                        <label style="font-size: 12px; font-weight: bold;">Dirección (Opcional)</label>
-                        <input id="swal-address" class="swal2-input" style="margin:0; width:100%" placeholder="Calle, Av, Jr...">
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div>
-                            <label style="font-size: 12px; font-weight: bold;">Teléfono</label>
-                            <input id="swal-phone" class="swal2-input" style="margin:0; width:100%" placeholder="999888777">
-                        </div>
-                        <div>
-                            <label style="font-size: 12px; font-weight: bold;">Email (Obligatorio)</label>
-                            <input id="swal-email" type="email" class="swal2-input" style="margin:0; width:100%" placeholder="correo@gmail.com">
-                        </div>
+
+                        <footer className="modal-footer">
+                            <button className="btn-secondary" onClick={closeModal}>Cancelar</button>
+                            <button className="btn-primary" onClick={handleSaveClient}>Registrar Cliente</button>
+                        </footer>
                     </div>
                 </div>
             `,
