@@ -8,6 +8,7 @@ import Orders from './pages/orders';
 import CashClosing from './pages/cashClosing';
 import MainLayout from './layouts/MainLayout/MainLayout';
 import ProtectedRouter from './components/ProtectedRouter';
+import { SaaSGrid } from './components/SaaSGrid';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
             <Route path="ventas" element={<Sales />} />
             <Route path="detalle" element={<Orders />} />
             <Route path="cierre" element={<CashClosing />} />
+            <Route path="features" element={<SaaSGrid />} /> 
 
             {/* RUTA EXCLUSIVA PARA ADMIN (Segundo nivel de protección) */}
             <Route element={<ProtectedRouter allowedRoles={['admin']} />}>
@@ -39,6 +41,7 @@ function App() {
         <Route path="*" element={<Login />} />
       </Routes>
     </Router>
+    
   );
 }
 
