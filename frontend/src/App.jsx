@@ -28,11 +28,10 @@ function App() {
             <Route path="detalle" element={<Orders />} />
             <Route path="cierre" element={<CashClosing />} />
             <Route path="features" element={<SaaSGrid />} /> 
+            <Route path="inventario" element={<Inventory />} />
 
-            {/* RUTA EXCLUSIVA PARA ADMIN (Segundo nivel de protección) */}
-            <Route element={<ProtectedRouter allowedRoles={['admin']} />}>
-              <Route path="inventario" element={<Inventory />} />
-            </Route>
+
+            
 
           </Route>
         </Route>
